@@ -6,6 +6,7 @@ from aiogram.utils import executor
 from config import *
 from math import ceil
 
+
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(bot)
 
