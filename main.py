@@ -1,12 +1,10 @@
-import os
 import datetime
 import httpx
-from aiogram import Bot, types
-from aiogram.dispatcher import Dispatcher
+from aiogram import Bot, Dispatcher, types
 from aiogram.types import ParseMode
 from aiogram.utils import executor
 from config import *
-import math
+from math import ceil
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(bot)
@@ -20,45 +18,54 @@ async def start_command(msg: types.Message):
 @dp.message_handler()
 async def get_weather(msg: types.Message):
     try:
-        response = httpx.get(
-            f'http://api.openweathermap.org/data/2.5/weather?q={msg.text}&appid={API_KEY}&units=metric')  # Исправлено на API_KEY
-        data = response.json()
-        city = data['name']
-        cur_weather = data['main']['temp']
-        humidity = data['main']['humidity']
-        pressure = data['main']['pressure']
-        wind = data['wind']['speed']
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f'http://api.openweathermap.org/data/2.5/weather',
+                params={'q': msg.text, 'appid': API_KEY, 'units': 'metric'}
+            )
+            response.raise_for_status()
 
-        sunrise_timestamp = datetime.datetime.fromtimestamp(data['sys']['sunrise'])
-        sunset_timestamp = datetime.datetime.fromtimestamp(data['sys']['sunset'])
+            data = response.json()
+            weather = data['weather'][0]
+            main = data['main']
+            wind = data['wind']
+            sys = data['sys']
 
-        length_day = sunset_timestamp - sunrise_timestamp
+            city = data['name']
+            cur_weather = main['temp']
+            humidity = main['humidity']
+            pressure = main['pressure']
+            wind_speed = wind['speed']
 
-        code_to_smile = {
-            "Clear": "Ясно ☀️",
-            "Clouds": "Облачно ☁️",
-            "Rain": "Дождь 🌧️",
-            "Drizzle": "Дождь 🌧️",
-            "Thunderstorm": "Гроза ⛈️",
-            "Snow": "Снег 🌨️",
-            "Mist": "Туман 🌫️"
-        }
+            sunrise_timestamp = datetime.datetime.fromtimestamp(sys['sunrise'])
+            sunset_timestamp = datetime.datetime.fromtimestamp(sys['sunset'])
+            length_day = sunset_timestamp - sunrise_timestamp
 
-        weather_description = data['weather'][0]['main']
+            code_to_smile = {
+                "Clear": "Ясно ☀️",
+                "Clouds": "Облачно ☁️",
+                "Rain": "Дождь 🌧️",
+                "Drizzle": "Дождь 🌧️",
+                "Thunderstorm": "Гроза ⛈️",
+                "Snow": "Снег 🌨️",
+                "Mist": "Туман 🌫️"
+            }
+            weather_description = code_to_smile.get(weather['main'], 'Посмотри в окно, я не понимаю, что там за погода...')
 
-        if weather_description in code_to_smile:
-            wd = code_to_smile[weather_description]
-        else:
-            wd = 'Посмотри в окно, я не понимаю, что там за погода...'
-
-        await msg.reply(f"{datetime.datetime.now().strftime('%A %d-%b-%Y %H:%M')}\n"
-                        f"Погода в городе: {city}\nТемпература: {cur_weather} °C - {wd}\n"
-                        f"Влажность: {humidity}%\nДавление: {math.ceil(pressure / 1.333)} мм.рт.ст\nВетер: {wind} м/с \n"
-                        f"Восход солнца: {sunrise_timestamp.strftime('%H:%M')}\nЗакат солнца: {sunset_timestamp.strftime('%H:%M')}\nПродолжительность дня: {length_day}\n"
-                        f"Хорошего дня!", parse_mode=ParseMode.HTML)
-    except Exception as e:  # Уточним тип ошибки для отладки
-        print(f"An error occurred: {e}")
-        await msg.reply('Проверьте название города')
+            await msg.reply(
+                f"{datetime.datetime.now().strftime('%A %d-%b-%Y %H:%M')}\n"
+                f"Погода в городе: {city}\nТемпература: {cur_weather} °C - {weather_description}\n"
+                f"Влажность: {humidity}%\nДавление: {ceil(pressure / 1.333)} мм.рт.ст\nВетер: {wind_speed} м/с \n"
+                f"Восход солнца: {sunrise_timestamp.strftime('%H:%M')}\nЗакат солнца: {sunset_timestamp.strftime('%H:%M')}\nПродолжительность дня: {length_day}\n"
+                f"Хорошего дня!",
+                parse_mode=ParseMode.HTML
+            )
+    except httpx.HTTPError as http_err:
+        print(f"HTTP ошибка: {http_err}")
+        await msg.reply('Ошибка при выполнении HTTP-запроса')
+    except Exception as e:
+        print(f"Ошибка: {e}")
+        await msg.reply('Произошла ошибка. Пожалуйста, попробуйте еще раз')
 
 
 if __name__ == '__main__':
