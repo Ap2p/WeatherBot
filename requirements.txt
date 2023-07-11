@@ -28,3 +28,6 @@ virtualenv==20.23.0
 wheel==0.38.4
 yarl==1.9.2
 
+
+geopy==2.3.0
+timezonefinder==6.2.0
