@@ -31,3 +31,5 @@ yarl==1.9.2
 
 geopy==2.3.0
 timezonefinder==6.2.0
+utils==1.0.1
+translations==0.1.3
